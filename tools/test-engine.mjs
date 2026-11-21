@@ -4,10 +4,10 @@
  * Uso: node lorem/tools/test-engine.mjs
  *
  * Carica data/themes.js e engine.js in un contesto `vm` con un finto
- * `window` (niente bundler), poi verifica per tutti gli 8 temi:
+ * `window` (niente bundler), poi verifica per tutti i 10 temi:
  * determinismo col seed, conteggi esatti di parole/frasi/paragrafi,
  * HTML, JSON, markdown, igiene della punteggiatura, startClassic,
- * validazione degli input e qualità minima dei corpora.
+ * formato logogrammi, validazione degli input e qualità minima dei corpora.
  *
  * Esce con codice 1 se almeno un controllo fallisce.
  */
@@ -99,6 +99,46 @@ function blocchi(testo) {
     .filter((blocco) => blocco.length > 0);
 }
 
+function contaGlifi(svg) {
+  return (String(svg).match(/<g class="glifo"/g) || []).length;
+}
+
+function viewBoxDi(svg) {
+  const trovato = String(svg).match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+  return trovato
+    ? { width: Number(trovato[1]), height: Number(trovato[2]) }
+    : null;
+}
+
+/* Coordinata (x o y) dei gruppi: serve a contare colonne e righe della
+ * griglia senza fidarsi solo del viewBox. */
+function coordinateGlifi(svg, asse) {
+  const valori = new Set();
+  const re = /translate\((-?[\d.]+) (-?[\d.]+)\)/g;
+  let trovato;
+  while ((trovato = re.exec(String(svg)))) {
+    valori.add(asse === "x" ? trovato[1] : trovato[2]);
+  }
+  return valori.size;
+}
+
+/* Distanza in linea d'aria tra inizio e fine dell'anello: un cerchio
+ * davvero aperto ha una corda non nulla. */
+function aperturaAnello(pathD) {
+  const secondoM = pathD.indexOf("M", 1);
+  const anello = secondoM > 0 ? pathD.slice(0, secondoM) : pathD;
+  const punti = anello.match(/[ML](-?[\d.]+) (-?[\d.]+)/g) || [];
+  if (punti.length < 2) return 0;
+  const primo = punti[0].slice(1).split(" ").map(Number);
+  const ultimo = punti[punti.length - 1].slice(1).split(" ").map(Number);
+  return Math.hypot(primo[0] - ultimo[0], primo[1] - ultimo[1]);
+}
+
+function anelliDi(svg) {
+  return [...String(svg).matchAll(/<g class="glifo"[^>]*><path d="([^"]+)"/g)]
+    .map((trovato) => trovato[1]);
+}
+
 const TEMI_ATTESI = [
   "classico",
   "pinocchio",
@@ -107,7 +147,9 @@ const TEMI_ATTESI = [
   "cucina",
   "astronomia",
   "fantascienza",
-  "hipster"
+  "hipster",
+  "neo",
+  "heptapod"
 ];
 
 const PAROLE_FUNZIONE_IT = new Set([
@@ -177,7 +219,7 @@ for (const id of TEMI_ATTESI) {
       `${id}: label vuota`
     );
     verifica(
-      scheda.lang === "it" || scheda.lang === "la",
+      scheda.lang === "it" || scheda.lang === "la" || scheda.lang === "neo",
       `${id}: lang inattesa "${scheda.lang}"`
     );
     verifica(
@@ -248,6 +290,53 @@ for (const id of TEMI_ATTESI) {
       `${id}: parola duplicata nel tema — "${parola}"`
     );
     paroleLocali.add(parola);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Temi v2: vincoli specifici della sezione «Aggiunta v2»              */
+/* ------------------------------------------------------------------ */
+
+{
+  const neo = themes.neo;
+  const heptapod = themes.heptapod;
+
+  verifica(!!neo, 'tema "neo" mancante');
+  if (neo) {
+    verificaUguale("Neo", neo.label, "neo: label");
+    verificaUguale("neo", neo.lang, "neo: lang");
+    verifica(
+      /imitazione dichiarata, non una traduzione/.test(neo.about || ""),
+      "neo: about senza la dicitura «imitazione dichiarata, non una traduzione»"
+    );
+    verifica(
+      (neo.sentences || []).length >= 30,
+      "neo: servono almeno 30 frasi"
+    );
+    verifica((neo.words || []).length >= 90, "neo: servono almeno 90 voci");
+  }
+
+  verifica(!!heptapod, 'tema "heptapod" mancante');
+  if (heptapod) {
+    verificaUguale("Eptapodi", heptapod.label, "heptapod: label");
+    verificaUguale("it", heptapod.lang, "heptapod: lang");
+    verifica(
+      /Arrival/.test(heptapod.about || "") &&
+        /Chiang/.test(heptapod.about || ""),
+      "heptapod: about non cita Arrival e Ted Chiang"
+    );
+    verifica(
+      /nessuna citazione/i.test(heptapod.about || ""),
+      "heptapod: about non dichiara l'assenza di citazioni"
+    );
+    verifica(
+      (heptapod.sentences || []).length >= 30,
+      "heptapod: servono almeno 30 frasi"
+    );
+    verifica(
+      (heptapod.words || []).length >= 90,
+      "heptapod: servono almeno 90 voci"
+    );
   }
 }
 
@@ -535,7 +624,7 @@ for (const id of TEMI_ATTESI) {
 
   /* La lingua del tema determina i connettivi: nessun testo vuoto. */
   verifica(
-    lingua === "it" || lingua === "la",
+    lingua === "it" || lingua === "la" || lingua === "neo",
     `${etichetta} lingua inattesa`
   );
 }
@@ -617,6 +706,261 @@ for (const id of TEMI_ATTESI) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Formato logogrammi                                                  */
+/* ------------------------------------------------------------------ */
+
+{
+  const ETICHETTA = "logogrammi";
+  const COLORE_FISSO = /(#[0-9a-fA-F]{3,8}\b)|\brgb\(|\bhsl\(/;
+
+  for (const id of TEMI_ATTESI) {
+    const a = engine.generate({
+      theme: id,
+      count: 9,
+      seed: 31415,
+      logogram: true
+    });
+    const b = engine.generate({
+      theme: id,
+      count: 9,
+      seed: 31415,
+      logogram: true
+    });
+    const c = engine.generate({
+      theme: id,
+      count: 9,
+      seed: 31416,
+      logogram: true
+    });
+    const etichetta = `[${id}] ${ETICHETTA}`;
+
+    /* Struttura dell'SVG. */
+    verifica(a.text.startsWith("<svg"), `${etichetta}: non inizia con <svg`);
+    verifica(a.text.endsWith("</svg>"), `${etichetta}: non finisce con </svg>`);
+    verifica(
+      (a.text.match(/<svg\b/g) || []).length === 1,
+      `${etichetta}: più di un elemento <svg>`
+    );
+    verifica(
+      /viewBox="0 0 [\d.]+ [\d.]+"/.test(a.text),
+      `${etichetta}: manca viewBox`
+    );
+    verifica(/role="img"/.test(a.text), `${etichetta}: manca role="img"`);
+    verifica(
+      /<title>Logogrammi eptapodi, 9 glifi<\/title>/.test(a.text),
+      `${etichetta}: <title> mancante o non in italiano`
+    );
+    verifica(
+      /aria-label="Logogrammi eptapodi, 9 glifi"/.test(a.text),
+      `${etichetta}: aria-label mancante o non coerente`
+    );
+    verifica(
+      /stroke="currentColor"/.test(a.text),
+      `${etichetta}: stroke non è currentColor`
+    );
+    verifica(/fill="none"/.test(a.text), `${etichetta}: fill non è none`);
+    verifica(
+      !COLORE_FISSO.test(a.text),
+      `${etichetta}: contiene un colore fisso`
+    );
+
+    /* Glifi, metadati, determinismo. */
+    verificaUguale(9, contaGlifi(a.text), `${etichetta}: numero di glifi`);
+    verificaUguale(9, a.meta.count, `${etichetta}: meta.count`);
+    verificaUguale(9, a.meta.glyphs, `${etichetta}: meta.glyphs`);
+    verificaUguale(0, a.meta.words, `${etichetta}: meta.words`);
+    verificaUguale("logograms", a.meta.unit, `${etichetta}: meta.unit`);
+    verificaUguale(id, a.meta.theme, `${etichetta}: meta.theme`);
+    verificaUguale(a.text, b.text, `${etichetta}: determinismo byte per byte`);
+    verifica(
+      a.text !== c.text,
+      `${etichetta}: seed diversi producono lo stesso SVG`
+    );
+    verifica(
+      (a.text.match(/<g\b/g) || []).length ===
+        (a.text.match(/<\/g>/g) || []).length,
+      `${etichetta}: tag <g> non bilanciati`
+    );
+    verifica(
+      (a.text.match(/<g class="glifo"/g) || []).length ===
+        (a.text.match(/<\/g>/g) || []).length - 1,
+      `${etichetta}: gruppi dei glifi non coerenti`
+    );
+    verifica(
+      (a.text.match(/C/g) || []).length >= 9,
+      `${etichetta}: nessun tendril (comandi C) nei glifi`
+    );
+
+    /* unit ignorata: anche un'unità inesistente non deve far fallire. */
+    const ignoraUnita = engine.generate({
+      theme: id,
+      unit: "righe",
+      count: 2,
+      seed: 5,
+      logogram: true
+    });
+    verificaUguale(
+      2,
+      contaGlifi(ignoraUnita.text),
+      `${etichetta}: unit non ignorata`
+    );
+
+    /* Precedenza su html, markdown e json. */
+    const precedenza = engine.generate({
+      theme: id,
+      count: 2,
+      seed: 5,
+      logogram: true,
+      html: true,
+      markdown: true,
+      json: true
+    });
+    verifica(
+      precedenza.text.startsWith("<svg"),
+      `${etichetta}: html/markdown/json hanno preceduto logogram`
+    );
+  }
+
+  /* Limiti: 1 e 48 glifi, default, dimensione esatta della griglia. */
+  const uno = engine.generate({
+    theme: "heptapod",
+    count: 1,
+    seed: 1,
+    logogram: true
+  });
+  verificaUguale(1, contaGlifi(uno.text), "logogrammi: count=1");
+  verificaUguale(1, uno.meta.glyphs, "logogrammi: meta.glyphs con count=1");
+
+  const massimo = engine.generate({
+    theme: "heptapod",
+    count: 48,
+    seed: 1,
+    logogram: true
+  });
+  verificaUguale(48, contaGlifi(massimo.text), "logogrammi: count=48");
+  verificaUguale(48, massimo.meta.glyphs, "logogrammi: meta.glyphs con count=48");
+  const vbUno = viewBoxDi(uno.text);
+  const vbMax = viewBoxDi(massimo.text);
+  verifica(!!vbUno && !!vbMax, "logogrammi: viewBox non leggibile");
+  if (vbUno && vbMax) {
+    verificaUguale(152, vbUno.width, "logogrammi: viewBox di 1 glifo (larghezza)");
+    verificaUguale(152, vbUno.height, "logogrammi: viewBox di 1 glifo (altezza)");
+    verificaUguale(592, vbMax.width, "logogrammi: viewBox di 48 glifi (larghezza)");
+    verificaUguale(768, vbMax.height, "logogrammi: viewBox di 48 glifi (altezza)");
+    verifica(
+      vbMax.width <= 1200,
+      `logogrammi: larghezza ${vbMax.width} oltre 1200 unità`
+    );
+    verifica(
+      vbMax.height > vbUno.height,
+      "logogrammi: la griglia da 48 glifi non va a capo"
+    );
+    verificaUguale(
+      6,
+      coordinateGlifi(massimo.text, "x"),
+      "logogrammi: massimo 6 glifi per riga"
+    );
+    verificaUguale(
+      8,
+      coordinateGlifi(massimo.text, "y"),
+      "logogrammi: 48 glifi su 8 righe"
+    );
+  }
+
+  /* Griglia da 12 glifi: 6 per riga, 2 righe, viewBox 592×240. */
+  const dodici = engine.generate({
+    theme: "heptapod",
+    count: 12,
+    seed: 7,
+    logogram: true
+  });
+  const vbDodici = viewBoxDi(dodici.text);
+  verifica(!!vbDodici, "logogrammi: viewBox di 12 glifi non leggibile");
+  if (vbDodici) {
+    verificaUguale(592, vbDodici.width, "logogrammi: 12 glifi, larghezza 592");
+    verificaUguale(240, vbDodici.height, "logogrammi: 12 glifi, altezza 240");
+    verificaUguale(6, coordinateGlifi(dodici.text, "x"), "logogrammi: 12 glifi, 6 colonne");
+    verificaUguale(2, coordinateGlifi(dodici.text, "y"), "logogrammi: 12 glifi, 2 righe");
+  }
+
+  /* Griglia da 6 e da 7: il salto di riga è netto. */
+  const sei = engine.generate({
+    theme: "heptapod",
+    count: 6,
+    seed: 2,
+    logogram: true
+  });
+  const sette = engine.generate({
+    theme: "heptapod",
+    count: 7,
+    seed: 2,
+    logogram: true
+  });
+  const vbSei = viewBoxDi(sei.text);
+  const vbSette = viewBoxDi(sette.text);
+  if (vbSei && vbSette) {
+    verificaUguale(592, vbSei.width, "logogrammi: 6 glifi, larghezza 592");
+    verificaUguale(152, vbSei.height, "logogrammi: 6 glifi, altezza 152");
+    verificaUguale(592, vbSette.width, "logogrammi: 7 glifi, larghezza 592");
+    verificaUguale(240, vbSette.height, "logogrammi: 7 glifi, altezza 240");
+    verificaUguale(2, coordinateGlifi(sette.text, "y"), "logogrammi: 7 glifi su 2 righe");
+  }
+
+  /* Forma: anelli aperti, glifi tutti diversi, nessun tratto chiuso. */
+  const anelli = anelliDi(dodici.text);
+  verificaUguale(12, anelli.length, "logogrammi: anelli non estraibili");
+  verifica(
+    !/Z/.test(dodici.text),
+    "logogrammi: un glifo chiude il cerchio con Z"
+  );
+  verificaUguale(
+    anelli.length,
+    new Set(anelli).size,
+    "logogrammi: glifi identici nello stesso SVG"
+  );
+  if (anelli.length) {
+    const aperture = anelli.map(aperturaAnello);
+    verifica(
+      aperture.every((valore) => valore > 3),
+      "logogrammi: qualche anello sembra chiuso"
+    );
+    verifica(
+      Math.max(...aperture) > 25,
+      "logogrammi: nessun glifo con apertura netta"
+    );
+  }
+  verifica(
+    anelli.join("|") !==
+      anelliDi(
+        engine.generate({
+          theme: "heptapod",
+          count: 12,
+          seed: 8,
+          logogram: true
+        }).text
+      ).join("|"),
+    "logogrammi: due seed diversi disegnano gli stessi glifi"
+  );
+
+  const predefinito = engine.generate({
+    theme: "heptapod",
+    seed: 1,
+    logogram: true
+  });
+  verificaUguale(
+    12,
+    contaGlifi(predefinito.text),
+    "logogrammi: count predefinito"
+  );
+  verificaUguale(12, predefinito.meta.count, "logogrammi: meta.count predefinito");
+  const vbPredefinito = viewBoxDi(predefinito.text);
+  if (vbPredefinito) {
+    verificaUguale(592, vbPredefinito.width, "logogrammi: default, larghezza");
+    verificaUguale(240, vbPredefinito.height, "logogrammi: default, altezza");
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Input invalidi: errori lanciati, messaggi in italiano                */
 /* ------------------------------------------------------------------ */
 
@@ -669,6 +1013,31 @@ verificaErrore(
   () => engine.generate({ seed: "abc" }),
   /[Ss]eed non valido/,
   "seed non numerico"
+);
+verificaErrore(
+  () => engine.generate({ theme: "heptapod", count: 0, logogram: true }),
+  /glifi/i,
+  "logogrammi: count=0"
+);
+verificaErrore(
+  () => engine.generate({ theme: "heptapod", count: 49, logogram: true }),
+  /glifi/i,
+  "logogrammi: count=49"
+);
+verificaErrore(
+  () => engine.generate({ theme: "heptapod", count: 2.5, logogram: true }),
+  /intero/i,
+  "logogrammi: count non intero"
+);
+verificaErrore(
+  () => engine.generate({ theme: "tema-inesistente", logogram: true }),
+  /[Tt]ema inesistente/,
+  "logogrammi: tema inesistente"
+);
+verificaErrore(
+  () => engine.generate({ theme: "heptapod", seed: "abc", logogram: true }),
+  /[Ss]eed non valido/,
+  "logogrammi: seed non numerico"
 );
 
 /* ------------------------------------------------------------------ */

@@ -102,8 +102,14 @@
     }
   }
 
+  var GLYPH_LIMITS = { min: 1, max: 48, def: 12 };
+
+  function activeLimits() {
+    return state.format === "logogram" ? GLYPH_LIMITS : (LIMITS[state.unit] || LIMITS.paragraphs);
+  }
+
   function syncCountLimits() {
-    var lim = LIMITS[state.unit] || LIMITS.paragraphs;
+    var lim = activeLimits();
     els.count.min = String(lim.min);
     els.count.max = String(lim.max);
     if (state.count < lim.min || state.count > lim.max) state.count = lim.def;
@@ -111,7 +117,7 @@
   }
 
   function updateClassicAvailability() {
-    var ok = state.theme === "classico" && state.unit === "paragraphs";
+    var ok = state.theme === "classico" && state.unit === "paragraphs" && state.format !== "logogram";
     els.classic.disabled = !ok;
     if (!ok) state.classic = false;
     els.classic.checked = state.classic;
@@ -121,16 +127,20 @@
   }
 
   function formatMeta() {
-    var labels = { text: "Testo", html: "HTML", markdown: "Markdown", json: "JSON" };
+    var labels = { text: "Testo", html: "HTML", markdown: "Markdown", json: "JSON", logogram: "Logogrammi" };
     return labels[state.format] || "Testo";
   }
 
   function fail(msg) {
+    if (els.outputGlyphs) { els.outputGlyphs.hidden = true; els.outputGlyphs.innerHTML = ""; }
+    if (els.output) els.output.hidden = false;
     els.output.textContent = "⚠ " + msg;
     els.outputTitle.textContent = "errore";
     els.stats.textContent = "—";
     els.share.hidden = true;
   }
+
+  var lastOutput = { text: "", svg: false };
 
   function generate(quiet) {
     if (!window.LoremEngine || typeof window.LoremEngine.generate !== "function") {
@@ -138,6 +148,7 @@
       return;
     }
     updateClassicAvailability();
+    var logogram = state.format === "logogram";
 
     var opts = {
       theme: state.theme,
@@ -147,6 +158,7 @@
       html: state.format === "html",
       markdown: state.format === "markdown",
       json: state.format === "json",
+      logogram: logogram,
       startClassic: state.classic && state.theme === "classico" && state.unit === "paragraphs"
     };
 
@@ -158,19 +170,30 @@
       return;
     }
 
-    els.output.textContent = res.text;
-    els.output.scrollTop = 0;
-
     var th = engineThemes().filter(function (t) { return t.id === state.theme; })[0];
     var thLabel = th ? th.label : state.theme;
     els.outputTitle.textContent = thLabel + " · " + formatMeta() + " · seed " + state.seed;
 
-    var words = res.meta && res.meta.words != null ? res.meta.words : countWords(res.text);
-    var chars = res.text.length;
-    els.stats.textContent = words + " parole · " + chars + " caratteri · " + (state.unit === "paragraphs" ? state.count + " paragrafi" : state.unit === "sentences" ? state.count + " frasi" : state.count + " parole");
+    if (logogram) {
+      els.outputGlyphs.innerHTML = res.text;
+      els.outputGlyphs.hidden = false;
+      els.output.hidden = true;
+      els.stats.textContent = state.count + " glifi · " + res.meta.theme + " · seed " + state.seed;
+      lastOutput = { text: res.text, svg: true };
+    } else {
+      els.outputGlyphs.hidden = true;
+      els.outputGlyphs.innerHTML = "";
+      els.output.hidden = false;
+      els.output.textContent = res.text;
+      els.output.scrollTop = 0;
+      var words = res.meta && res.meta.words != null ? res.meta.words : countWords(res.text);
+      var chars = res.text.length;
+      els.stats.textContent = words + " parole · " + chars + " caratteri · " + (state.unit === "paragraphs" ? state.count + " paragrafi" : state.unit === "sentences" ? state.count + " frasi" : state.count + " parole");
+      lastOutput = { text: res.text, svg: false };
+    }
     els.share.hidden = false;
     syncHash();
-    if (!quiet) els.output.focus({ preventScroll: true });
+    if (!quiet) (logogram ? els.outputGlyphs : els.output).focus({ preventScroll: true });
   }
 
   function countWords(t) {
@@ -203,7 +226,7 @@
     if (p.unita && LIMITS[p.unita]) { state.unit = p.unita; touched = true; }
     if (p.n) { var n = parseInt(p.n, 10); if (n > 0) { state.count = n; touched = true; } }
     if (p.seed) { var s = parseInt(p.seed, 10); if (!isNaN(s)) { state.seed = s; touched = true; } }
-    if (p.formato && ["text", "html", "markdown", "json"].indexOf(p.formato) !== -1) { state.format = p.formato; touched = true; }
+    if (p.formato && ["text", "html", "markdown", "json", "logogram"].indexOf(p.formato) !== -1) { state.format = p.formato; touched = true; }
     return touched;
   }
 
@@ -217,7 +240,7 @@
   }
 
   async function copyOutput() {
-    var text = els.output.textContent;
+    var text = lastOutput.text;
     if (!text || text === "—") return;
     try {
       await navigator.clipboard.writeText(text);
@@ -243,10 +266,10 @@
   }
 
   function download() {
-    var text = els.output.textContent;
+    var text = lastOutput.text;
     if (!text || text === "—") return;
-    var ext = state.format === "html" ? "html" : state.format === "markdown" ? "md" : state.format === "json" ? "json" : "txt";
-    var mime = state.format === "html" ? "text/html" : state.format === "json" ? "application/json" : "text/plain";
+    var ext = state.format === "logogram" ? "svg" : state.format === "html" ? "html" : state.format === "markdown" ? "md" : state.format === "json" ? "json" : "txt";
+    var mime = state.format === "logogram" ? "image/svg+xml" : state.format === "html" ? "text/html" : state.format === "json" ? "application/json" : "text/plain";
     var blob = new Blob([text + (ext === "txt" ? "\n" : "")], { type: mime + ";charset=utf-8" });
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -266,6 +289,7 @@
     els.classic = $("#classic");
     els.generate = $("#generate");
     els.output = $("#output");
+    els.outputGlyphs = $("#outputGlyphs");
     els.outputTitle = $("#outputTitle");
     els.stats = $("#outStats");
     els.copy = $("#copy");
@@ -285,14 +309,14 @@
 
     els.unit.addEventListener("change", function () {
       state.unit = els.unit.value;
-      state.count = LIMITS[state.unit].def;
+      state.count = activeLimits().def;
       syncCountLimits();
       updateClassicAvailability();
       generate();
     });
 
     els.count.addEventListener("input", function () {
-      var lim = LIMITS[state.unit];
+      var lim = activeLimits();
       var v = parseInt(els.count.value, 10);
       if (isNaN(v)) return;
       state.count = Math.max(lim.min, Math.min(lim.max, v));
@@ -305,6 +329,8 @@
 
     els.format.addEventListener("change", function () {
       state.format = els.format.value;
+      syncCountLimits();
+      updateClassicAvailability();
       generate();
     });
 

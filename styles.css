@@ -377,6 +377,8 @@ a:focus-visible {
 
 .output-tools { display: flex; gap: 6px; }
 
+[hidden] { display: none !important; }
+
 .output {
   margin: 0;
   padding: 22px 24px;
@@ -393,6 +395,25 @@ a:focus-visible {
 }
 
 .output:empty::before { content: "—"; color: var(--faint); }
+
+.output.glyphs {
+  min-height: 240px;
+  max-height: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 16px;
+  background: var(--card-solid);
+  overflow: auto;
+}
+
+.output.glyphs svg {
+  width: 100%;
+  max-width: 760px;
+  height: auto;
+  display: block;
+  color: var(--ink-soft);
+}
 
 .output-foot {
   display: flex;

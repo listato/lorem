@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f4efe4">
 <title>lorem.lorel.lol — generatori di lorem ipsum</title>
-<meta name="description" content="Un generatore di lorem ipsum in italiano con otto temi, quattro formati e un catalogo di 88 generatori dal mondo. Tutto calcolato nel browser: nessuna richiesta esterna, nessun cookie.">
+<meta name="description" content="Un generatore di lorem ipsum in italiano con dieci temi, cinque formati e un catalogo di 88 generatori dal mondo. Tutto calcolato nel browser: nessuna richiesta esterna, nessun cookie.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="lorem.lorel.lol">
 <meta property="og:title" content="lorem.lorel.lol — generatori di lorem ipsum">
-<meta property="og:description" content="Riempitivo generato nel browser, otto temi e 88 generatori da provare: il catalogo italiano dei lorem ipsum.">
+<meta property="og:description" content="Riempitivo generato nel browser, dieci temi, logogrammi e 88 generatori da provare: il catalogo italiano dei lorem ipsum.">
 <meta property="og:locale" content="it_IT">
 <meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="styles.css">
@@ -50,7 +50,7 @@
   <section class="hero" aria-labelledby="hero-title">
     <div class="hero-copy">
       <h1 id="hero-title">Il riempitivo<br>che si legge.</h1>
-      <p class="lead">Otto temi, quattro formati, un seed per ritrovare lo stesso testo. Generato nel browser: niente rete, niente cookie, niente tracciamento.</p>
+      <p class="lead">Dieci temi, cinque formati, un seed per ritrovare lo stesso testo. Generato nel browser: niente rete, niente cookie, niente tracciamento.</p>
       <p class="hint">Scorri per il catalogo degli 88 generatori del mondo.<br>
       <kbd>&#8984;</kbd><kbd>&#8629;</kbd> rigenera, <kbd>&#8984;</kbd><kbd>C</kbd> copia la selezione.</p>
     </div>
@@ -84,6 +84,7 @@
               <option value="html">HTML</option>
               <option value="markdown">Markdown</option>
               <option value="json">JSON</option>
+              <option value="logogram">Logogrammi</option>
             </select>
           </div>
           <div class="field">
@@ -114,6 +115,7 @@
           </div>
         </div>
         <pre class="output" id="output" tabindex="0" aria-live="polite">—</pre>
+        <div class="output glyphs" id="outputGlyphs" tabindex="0" aria-live="polite" hidden></div>
         <div class="output-foot">
           <span id="outStats">—</span>
           <a class="share" id="share" href="#" hidden>link condivisibile</a>
@@ -165,6 +167,10 @@
       <div>
         <h3>Perché in italiano</h3>
         <p>Quasi tutti i generatori esistenti producono inglese o latino. Un riempitivo si legge mentre si progetta: se la lingua non è la tua, il layout sembra sempre più giusto di quello che è. Qui i temi italiani servono a questo — compreso Pinocchio, che è pubblico dominio.</p>
+      </div>
+      <div>
+        <h3>Logogrammi</h3>
+        <p>Il quinto formato non produce parole ma disegni: ogni unità diventa un glifo circolare, un cerchio aperto con lobi e tendril calcolati dallo stesso seed. Serve a vedere subito se un riempimento grafico regge, o a stampare un poster che nessuno leggerà. Lo stesso seed ridisegna gli stessi segni.</p>
       </div>
       <div>
         <h3>Limiti dichiarati</h3>

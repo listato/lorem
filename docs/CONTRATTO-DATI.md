@@ -138,3 +138,41 @@ dominio), `ufficio`, `burocrazia`, `cucina`, `astronomia`, `fantascienza`,
   del sito. Il latino canonico e Collodi sono pubblico dominio.
 - La lista awesome-ipsum va citata con link e licenza reale (verificare se
   esiste `LICENSE` nella repo; se manca, dire «licenza non dichiarata»).
+
+## Aggiunta v2 — temi `neo` e `heptapod`, formato logogrammi
+
+### Nuovi temi in `data/themes.js`
+
+- `neo` — lingua artificiale di Arturo Alfandari (1961). `label: "Neo"`,
+  `lang: "neo"`, `about` deve dire esplicitamente «imitazione dichiarata, non
+  una traduzione». Almeno 30 frasi brevi, sintassi semplice, con radici
+  internazionali; è un pastiche consapevole, non filologia.
+- `heptapod` — `label: "Eptapodi"`, `lang: "it"`, `about` sul linguaggio
+  circolare degli eptapodi (Arrival) e sul tempo non lineare. 30+ frasi
+  italiane originali, nessuna citazione dal film o dal racconto di Ted Chiang.
+
+Entrambi con `words` ≥ 90.
+
+### Formato logogrammi
+
+Nuova opzione booleana in `generate()`: `logogram: true`.
+
+```js
+LoremEngine.generate({ theme: "heptapod", count: 12, seed: 7, logogram: true })
+// → { text: "<svg …>…</svg>", meta: { theme, unit: "logograms", count: 12, glyphs: 12, words: 0 } }
+```
+
+- Con `logogram: true` ogni unità diventa un **glifo** disegnato in SVG: un
+  cerchio aperto con 2–6 lobi e 1–6 tendril, geometria deterministica
+  dall'hash di `(seed, indice, parola)`. Stesso seed, stesso disegno.
+- `count` = numero di glifi, 1–48. `unit` è ignorata.
+- L'SVG è un unico elemento con `viewBox`, `role="img"`,
+  `<title>` in italiano («Logogrammi eptapodi, N glifi») e `aria-label`;
+  niente colori fissi: `stroke="currentColor"`, `fill="none"`, sfondo
+  trasparente, così funziona nei due temi.
+- Disposizione: griglia che va a capo, glifi da ~44 px unità SVG, padding
+  generoso; larghezza massima 1200 unità.
+- `logogram` ha precedenza su `html`, `markdown`, `json` (ignorati).
+- Disponibile per **tutti** i temi: il tema `heptapod` dà frasi sul linguaggio,
+  il formato trasforma qualunque testo in glifi.
+- Nessuna dipendenza, nessun DOM in `engine.js`: si restituisce solo la stringa.

@@ -12,8 +12,10 @@
  * API:
  *   LoremEngine.themes() -> [{ id, label, lang, about }]
  *   LoremEngine.generate({ theme, unit, count, html, markdown, json,
- *                          seed, startClassic, lang })
+ *                          seed, startClassic, lang, logogram })
  *     -> { text, meta: { theme, unit, count, sentences, words } }
+ *        con logogram:true -> { text: "<svg…>", meta: { theme,
+ *                              unit: "logograms", count, glyphs, words: 0 } }
  */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();
@@ -44,8 +46,22 @@
     la: [
       "Deinde,", "Praeterea,", "Itaque,", "Interea,", "Tamen,",
       "Porro,", "Atque etiam,", "Hinc,", "Postremo,", "Nimirum,"
+    ],
+    neo: [
+      "Dunke,", "Ma,", "E,", "Anke,", "Pos,", "Kande,", "Sempre,",
+      "Nunka,", "Multe,", "Poko,"
     ]
   };
+
+  /* Formato logogrammi: limiti e griglia. Passo di 88 unità con glifo
+   * visivo di ~72: 16 unità di luce restano tra un glifo e l'altro.
+   * Massimo 6 glifi per riga, padding 32, larghezza sempre sotto le
+   * 1200 unità previste. Con 12 glifi il viewBox è 592×240. */
+  var LOGOGRAM_RANGE = { min: 1, max: 48, label: "glifi", fallback: 12 };
+  var GLYPH_PITCH = 88;
+  var SVG_PADDING = 32;
+  var SVG_MAX_COLUMNS = 6;
+  var SVG_MAX_WIDTH = 1200;
 
   /* Incipit latino canonico (lorem ipsum, dal lessico di Cicerone,
    * pubblico dominio): primo paragrafo di startClassic. */
@@ -100,6 +116,35 @@
       a[j] = tmp;
     }
     return a;
+  }
+
+  /* Hash FNV-1a a 32 bit: lega il disegno di un glifo alla terna
+   * (seed, indice, parola), come richiesto dal contratto. */
+  function hash32(text) {
+    var h = 2166136261 >>> 0;
+    var str = String(text);
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+
+  /* Normalizza il seed: intero, default fisso, deterministico. */
+  function readSeed(value) {
+    var seed = value == null ? 1 : value;
+    if (typeof seed !== "number" || !isFinite(seed)) {
+      throw new Error("Seed non valido: deve essere un numero intero.");
+    }
+    return Math.floor(seed) >>> 0;
+  }
+
+  /* Numeri con un solo decimale, senza "-0" e senza dipendere dalla
+   * locale: servono per avere lo stesso SVG byte per byte. */
+  function formatNumber(value) {
+    var rounded = Math.round(value * 10) / 10;
+    if (rounded === 0) rounded = 0;
+    return String(rounded);
   }
 
   /* ---------------------------------------------------------------- */
@@ -228,11 +273,10 @@
   /* Costruzione di unit: words                                        */
   /* ---------------------------------------------------------------- */
 
-  /* Appiattisce parole e locuzioni in singoli token, elimina i duplicati
-   * (senza distinzione tra maiuscole e minuscole) e ripete il mazzo in
-   * ciclo finché non ha prodotto esattamente `count` parole. Per l'italiano
-   * le parole funzione interne alle locuzioni vengono scartate. */
-  function buildWordText(rng, corpusWords, count, lang) {
+  /* Appiattisce parole e locuzioni in singoli token unici (senza distinzione
+   * tra maiuscole e minuscole). Per l'italiano le parole funzione interne
+   * alle locuzioni vengono scartate: "latte di avena" → "latte", "avena". */
+  function flattenCorpusWords(corpusWords, lang) {
     var tokens = [];
     var seen = Object.create(null);
 
@@ -250,6 +294,14 @@
         tokens.push(token);
       }
     }
+
+    return tokens;
+  }
+
+  /* Ripete il mazzo in ciclo finché non ha prodotto esattamente `count`
+   * parole, evitando la ripetizione immediata. */
+  function buildWordText(rng, corpusWords, count, lang) {
+    var tokens = flattenCorpusWords(corpusWords, lang);
 
     if (!tokens.length) {
       throw new Error("Il vocabolario del tema è vuoto: impossibile generare parole.");
@@ -272,6 +324,172 @@
     }
 
     return out.join(" ");
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Formato logogrammi                                                */
+  /* ---------------------------------------------------------------- */
+
+  /* Disegna un glifo in coordinate locali (0,0 = centro): un cerchio aperto
+   * con 2–6 lobi e 1–6 tendril. Tutti i parametri vengono dal PRNG del
+   * glifo, quindi il disegno dipende solo da (seed, indice, parola).
+   * Il glifo visivo sta in un diametro di ~72 unità, dentro un passo di 88. */
+  function buildGlyph(rng) {
+    var lobes = randInt(rng, 2, 6);
+    var tendrils = randInt(rng, 1, 6);
+    var radius = 24 + rng() * 5;
+    var amplitude = 2 + rng() * 3;
+    var phase = rng() * Math.PI * 2;
+    var rotation = rng() * Math.PI * 2;
+
+    /* Apertura: circa un glifo su tre ha un taglio netto (una "C" evidente),
+     * gli altri restano quasi chiusi. Il taglio è ciò che rende subito
+     * riconoscibile un cerchio aperto anche a colpo d'occhio. */
+    var gap = rng() < 0.3 ? 1.9 + rng() * 0.8 : 0.5 + rng() * 0.9;
+
+    var start = rotation + gap / 2;
+    var end = rotation + Math.PI * 2 - gap / 2;
+    var steps = 72;
+    var path = "";
+    var i;
+
+    /* Anello aperto: raggio modulato in modo sinusoidale, un lobo per
+     * semionda. L'arco non si chiude, così il cerchio resta aperto. */
+    for (i = 0; i <= steps; i++) {
+      var angle = start + ((end - start) * i) / steps;
+      var wobble =
+        radius + amplitude * Math.sin(lobes * (angle - start) + phase);
+      path +=
+        (i === 0 ? "M" : "L") +
+        formatNumber(Math.cos(angle) * wobble) + " " +
+        formatNumber(Math.sin(angle) * wobble);
+    }
+
+    /* Tendril: viticci lunghi e asimmetrici che partono dall'anello e si
+     * arricciano verso l'esterno. Ogni tendril ha angolo, lunghezza,
+     * direzione e curvatura propri, così il glifo non è mai simmetrico.
+     * L'attacco resta dentro l'arco disegnato: mai sospeso nel vuoto
+     * dell'apertura. */
+    var arcSpan = end - start;
+    for (var j = 0; j < tendrils; j++) {
+      var spot = (j + 0.7) / (tendrils + 0.4);
+      var baseAngle =
+        start +
+        spot * arcSpan +
+        (rng() - 0.5) * Math.min(0.35, (arcSpan / (tendrils + 1)) * 0.6);
+      var baseRadius =
+        radius + amplitude * Math.sin(lobes * (baseAngle - start) + phase);
+      var length = 7 + rng() * 7;
+      var direction = rng() < 0.5 ? -1 : 1;
+      var curl = 0.7 + rng() * 0.9;
+      var cosA = Math.cos(baseAngle);
+      var sinA = Math.sin(baseAngle);
+      var tanX = -sinA * direction;
+      var tanY = cosA * direction;
+      var startX = cosA * baseRadius;
+      var startY = sinA * baseRadius;
+      var c1x = startX + cosA * length * 0.3 + tanX * length * curl * 0.3;
+      var c1y = startY + sinA * length * 0.3 + tanY * length * curl * 0.3;
+      var endX = startX + cosA * length * 0.5 + tanX * length * curl * 0.4;
+      var endY = startY + sinA * length * 0.5 + tanY * length * curl * 0.4;
+      var c2x = endX - cosA * length * 0.1 + tanX * length * curl * 0.25;
+      var c2y = endY - sinA * length * 0.1 + tanY * length * curl * 0.25;
+      path +=
+        "M" + formatNumber(startX) + " " + formatNumber(startY) +
+        "C" + formatNumber(c1x) + " " + formatNumber(c1y) + " " +
+        formatNumber(c2x) + " " + formatNumber(c2y) + " " +
+        formatNumber(endX) + " " + formatNumber(endY);
+    }
+
+    return '<path d="' + path + '"/>';
+  }
+
+  /* Costruisce un unico SVG con la griglia di glifi: massimo 6 per riga,
+   * padding 32, passo 88, larghezza massima 592 unità (ben dentro le 1200
+   * previste). Ogni glifo è un <path> dentro un <g class="glifo">. */
+  function buildLogogramSvg(themeId, theme, count, seed) {
+    var tokens = flattenCorpusWords(theme.words || [], theme.lang || "it");
+    if (!tokens.length) {
+      throw new Error(
+        'Il tema "' + themeId + '" non contiene parole: impossibile disegnare glifi.'
+      );
+    }
+
+    var columnsAvailable = Math.max(
+      1,
+      Math.min(
+        SVG_MAX_COLUMNS,
+        Math.floor((SVG_MAX_WIDTH - 2 * SVG_PADDING) / GLYPH_PITCH)
+      )
+    );
+    var columns = Math.min(count, columnsAvailable);
+    var rows = Math.ceil(count / columns);
+    var width = 2 * SVG_PADDING + columns * GLYPH_PITCH;
+    var height = 2 * SVG_PADDING + rows * GLYPH_PITCH;
+    var label = "Logogrammi eptapodi, " + count + " glifi";
+
+    var wordRng = mulberry32((seed ^ 0x9e3779b9) >>> 0);
+    var words = shuffle(tokens, wordRng);
+    var parts = [];
+
+    parts.push(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' +
+        width + " " + height + '" width="' + width + '" height="' + height +
+        '" role="img" aria-label="' + label +
+        '" stroke="currentColor" fill="none" stroke-linecap="round" ' +
+        'stroke-linejoin="round">'
+    );
+    parts.push("<title>" + label + "</title>");
+    parts.push('<g stroke-width="2.2">');
+
+    for (var i = 0; i < count; i++) {
+      var row = Math.floor(i / columns);
+      var column = i % columns;
+      var cx = SVG_PADDING + column * GLYPH_PITCH + GLYPH_PITCH / 2;
+      var cy = SVG_PADDING + row * GLYPH_PITCH + GLYPH_PITCH / 2;
+      var word = words[i % words.length];
+      var glyphRng = mulberry32(hash32(seed + "|" + i + "|" + word));
+      parts.push(
+        '<g class="glifo" transform="translate(' +
+          formatNumber(cx) + " " + formatNumber(cy) + ')">' +
+          buildGlyph(glyphRng) + "</g>"
+      );
+    }
+
+    parts.push("</g></svg>");
+    return parts.join("");
+  }
+
+  /* Ramo logogrammi: unit, html, markdown e json sono ignorati. */
+  function generateLogograms(options, themeId, theme) {
+    var count =
+      options.count == null ? LOGOGRAM_RANGE.fallback : options.count;
+    if (
+      typeof count !== "number" ||
+      !isFinite(count) ||
+      Math.floor(count) !== count
+    ) {
+      throw new Error("Numero di glifi non valido: deve essere un intero.");
+    }
+    if (count < LOGOGRAM_RANGE.min || count > LOGOGRAM_RANGE.max) {
+      throw new Error(
+        "Numero di glifi non valido: " + count +
+          ". Valori consentiti: da " + LOGOGRAM_RANGE.min +
+          " a " + LOGOGRAM_RANGE.max + "."
+      );
+    }
+
+    var seed = readSeed(options.seed);
+    return {
+      text: buildLogogramSvg(themeId, theme, count, seed),
+      meta: {
+        theme: themeId,
+        unit: "logograms",
+        count: count,
+        glyphs: count,
+        words: 0
+      }
+    };
   }
 
   /* ---------------------------------------------------------------- */
@@ -335,6 +553,11 @@
       );
     }
 
+    /* Formato logogrammi: ha precedenza su unit, html, markdown e json. */
+    if (opts.logogram) {
+      return generateLogograms(opts, themeId, theme);
+    }
+
     /* Unità di misura */
     var unit = opts.unit == null ? "paragraphs" : String(opts.unit);
     if (!Object.prototype.hasOwnProperty.call(UNIT_RANGES, unit)) {
@@ -361,11 +584,7 @@
     }
 
     /* Seed: intero, deterministico, default fisso */
-    var seed = opts.seed == null ? 1 : opts.seed;
-    if (typeof seed !== "number" || !isFinite(seed)) {
-      throw new Error("Seed non valido: deve essere un numero intero.");
-    }
-    seed = Math.floor(seed) >>> 0;
+    var seed = readSeed(opts.seed);
 
     var html = !!opts.html;
     var markdown = !!opts.markdown;
