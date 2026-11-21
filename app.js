@@ -542,7 +542,7 @@
     var n = list.length;
     var tot = cat.all.length;
     $("#catalogCount").textContent = n === tot
-      ? tot + " generatori · tutti visibili"
+      ? tot + " generatori · elenco completo"
       : n + " di " + tot + " generatori";
 
     $("#empty").hidden = n !== 0;
