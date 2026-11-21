@@ -122,7 +122,11 @@ secrets run --only CF_DEPLOY_TOKEN,CLOUDFLARE_ACCOUNT_ID -- bash -lc \
 ```
 
 Il progetto Pages è `lorem` (URL `lorem-4ea.pages.dev`), zone e custom domain
-sono nella zona `lorel.lol`. `npx wrangler` in questa macchina muore per la
+sono nella zona `lorel.lol`. `_headers` impone `max-age=0, must-revalidate` su
+tutto: i nomi dei file non contengono hash, quindi la cache edge va forzata a
+rivalidare a ogni deploy, altrimenti il dominio personalizzato resta indietro
+rispetto a `*.pages.dev` (è successo il 21/11/2026: asset vecchi con `age` di
+un'ora dopo un deploy corretto). `npx wrangler` in questa macchina muore per la
 cache npm con file di root: usare il `wrangler` globale.
 
 ## Verifiche fatte
