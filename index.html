@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="it" data-theme="light" class="preload">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f4efe4">
+<title>lorem.lorel.lol — generatori di lorem ipsum</title>
+<meta name="description" content="Un generatore di lorem ipsum in italiano con otto temi, quattro formati e un catalogo di 88 generatori dal mondo. Tutto calcolato nel browser: nessuna richiesta esterna, nessun cookie.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="lorem.lorel.lol">
+<meta property="og:title" content="lorem.lorel.lol — generatori di lorem ipsum">
+<meta property="og:description" content="Riempitivo generato nel browser, otto temi e 88 generatori da provare: il catalogo italiano dei lorem ipsum.">
+<meta property="og:locale" content="it_IT">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="styles.css">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231d1a14'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='19' text-anchor='middle' fill='%23e6c48f'%3El%3C/text%3E%3C/svg%3E">
+<script>
+  /* tema salvato prima del primo paint: niente lampo chiaro/scuro */
+  try {
+    var t = localStorage.getItem('lorem-theme');
+    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="top">
+  <a class="brand" href="./" aria-label="lorem.lorel.lol, home">
+    <svg class="mark" viewBox="0 0 40 40" aria-hidden="true">
+      <rect x="1" y="1" width="38" height="38" rx="9" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".45"/>
+      <path d="M13 11v17h8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="28.5" cy="12.5" r="2.1" fill="currentColor" opacity=".75"/>
+      <path d="M24 27.5h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity=".5"/>
+    </svg>
+    <span class="name">lorem<span class="tld">.lorel.lol</span></span>
+  </a>
+  <div class="top-side">
+    <p class="tagline">generatori di lorem ipsum</p>
+    <div class="themes" role="radiogroup" aria-label="Tema della pagina">
+      <button type="button" class="theme-btn" data-theme-mode="light" role="radio" aria-checked="true">Carta</button>
+      <button type="button" class="theme-btn" data-theme-mode="dark" role="radio" aria-checked="false">Inchiostro</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <h1 id="hero-title">Il riempitivo<br>che si legge.</h1>
+      <p class="lead">Otto temi, quattro formati, un seed per ritrovare lo stesso testo. Generato nel browser: niente rete, niente cookie, niente tracciamento.</p>
+      <p class="hint">Scorri per il catalogo degli 88 generatori del mondo.<br>
+      <kbd>&#8984;</kbd><kbd>&#8629;</kbd> rigenera, <kbd>&#8984;</kbd><kbd>C</kbd> copia la selezione.</p>
+    </div>
+
+    <div class="gen" aria-labelledby="gen-title">
+      <h2 class="sr-only" id="gen-title">Generatore di testo</h2>
+
+      <div class="gen-controls">
+        <fieldset class="field">
+          <legend>Tema</legend>
+          <div class="chips" id="themeChips" role="radiogroup" aria-label="Tema del testo"></div>
+        </fieldset>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="unit">Unità</label>
+            <select id="unit">
+              <option value="paragraphs">Paragrafi</option>
+              <option value="sentences">Frasi</option>
+              <option value="words">Parole</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="count">Quantità</label>
+            <input id="qty" type="number" inputmode="numeric" min="1" max="12" step="1" value="3">
+          </div>
+          <div class="field">
+            <label for="format">Formato</label>
+            <select id="format">
+              <option value="text">Testo</option>
+              <option value="html">HTML</option>
+              <option value="markdown">Markdown</option>
+              <option value="json">JSON</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="seed">Seed</label>
+            <input id="seed" type="number" inputmode="numeric" step="1" value="1">
+          </div>
+        </div>
+
+        <div class="gen-actions">
+          <button type="button" class="btn primary" id="generate">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h11M10 5l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Genera
+          </button>
+          <label class="switch">
+            <input type="checkbox" id="classic">
+            <span>Parti dal Lorem ipsum</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="output-wrap">
+        <div class="output-head">
+          <span class="output-title" id="outputTitle">testo generato</span>
+          <div class="output-tools">
+            <button type="button" class="btn ghost" id="copy" title="Copia negli appunti">Copia</button>
+            <button type="button" class="btn ghost" id="download" title="Scarica come file di testo">Scarica</button>
+            <button type="button" class="btn ghost" id="reroll" title="Nuovo seed, stesso tema">Rigenera</button>
+          </div>
+        </div>
+        <pre class="output" id="output" tabindex="0" aria-live="polite">—</pre>
+        <div class="output-foot">
+          <span id="outStats">—</span>
+          <a class="share" id="share" href="#" hidden>link condivisibile</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="catalogo" id="catalogo" aria-labelledby="cat-title">
+    <div class="sec-head">
+      <h2 id="cat-title">Il catalogo</h2>
+      <p class="sec-lead">Gli 88 generatori di <a href="https://github.com/templeman/awesome-ipsum" rel="noopener">awesome-ipsum</a>, con una riga in italiano per ciascuno. Stato dei link verificato il <span id="checkedDate">—</span>.</p>
+    </div>
+
+    <div class="stats" id="statGrid" aria-label="Il catalogo in numeri"></div>
+
+    <div class="filtri">
+      <div class="search-wrap">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13.2 13.2 17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input id="search" type="search" placeholder="Cerca per nome, lingua, tag o descrizione" autocomplete="off" aria-label="Cerca nel catalogo">
+        <button type="button" class="clear" id="clearSearch" aria-label="Azzera la ricerca" hidden>×</button>
+      </div>
+      <div class="filter-row">
+        <div class="chips cats" id="catChips" role="group" aria-label="Categoria"></div>
+        <div class="filter-side">
+          <select id="langFilter" aria-label="Lingua">
+            <option value="">Tutte le lingue</option>
+          </select>
+          <label class="switch small">
+            <input type="checkbox" id="onlyUp">
+            <span>Solo link attivi</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <p class="count" id="catalogCount" aria-live="polite">—</p>
+    <div class="grid" id="grid"></div>
+    <p class="empty" id="empty" hidden>Nessun generatore con questi filtri. <button type="button" class="linklike" id="resetFilters">Azzera i filtri</button></p>
+  </section>
+
+  <section class="come" aria-labelledby="come-title">
+    <h2 id="come-title">Come funziona il generatore</h2>
+    <div class="come-grid">
+      <div>
+        <h3>Frasi, non Catena di Markov</h3>
+        <p>Ogni tema è una raccolta di frasi complete scritte a mano. Il motore le scegle in modo pseudo-casuale ma riproducibile: lo stesso seed dà lo stesso testo, su qualunque browser. Non c'è un modello linguistico, e non c'è una richiesta a un server.</p>
+      </div>
+      <div>
+        <h3>Perché in italiano</h3>
+        <p>Quasi tutti i generatori esistenti producono inglese o latino. Un riempitivo si legge mentre si progetta: se la lingua non è la tua, il layout sembra sempre più giusto di quello che è. Qui i temi italiani servono a questo — compreso Pinocchio, che è pubblico dominio.</p>
+      </div>
+      <div>
+        <h3>Limiti dichiarati</h3>
+        <p>Le frasi sono finte ma grammaticali: non raccontano nulla. Il latino del tema classico è ricombinato dal lessico di Cicerone, non è una citazione continua. Il catalogo descrive i generatori di altri: l'unico contenuto verificato qui è che il link risponda.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <p>Catalogo dalla lista <a href="https://github.com/templeman/awesome-ipsum" rel="noopener">awesome-ipsum</a> di <a href="https://github.com/templeman" rel="noopener">templeman</a>; descrizioni, testi dei temi e motore sono nostri. Testi generati e frasi dei temi: CC BY-SA 4.0.</p>
+  <p>Nessun cookie, nessuna richiesta esterna al caricamento: il testo nasce nel browser. Il pulsante «Scarica» non carica niente, salva un file locale.</p>
+  <p class="anagramma">lorem e merlo sono anagrammi — <span title="In arrivo">merlo.lorel.lol</span></p>
+</footer>
+
+<noscript><p class="noscript">Questo generatore funziona con JavaScript: serve per comporre il testo nel browser, senza mandarlo a nessun server.</p></noscript>
+
+<script src="data/themes.js"></script>
+<script src="engine.js"></script>
+<script src="data/generators.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
