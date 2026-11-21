@@ -101,8 +101,12 @@ Cloudflare Pages, serve un progetto `lorem` e il dominio
 
 ```bash
 secrets run --only CF_DEPLOY_TOKEN,CLOUDFLARE_ACCOUNT_ID -- bash -lc \
-  'CLOUDFLARE_API_TOKEN=$CF_DEPLOY_TOKEN npx wrangler pages deploy . --project-name lorem --branch main'
+  'CLOUDFLARE_API_TOKEN=$CF_DEPLOY_TOKEN wrangler pages deploy . --project-name lorem --branch main'
 ```
+
+Il progetto Pages è `lorem` (URL `lorem-4ea.pages.dev`), zone e custom domain
+sono nella zona `lorel.lol`. `npx wrangler` in questa macchina muore per la
+cache npm con file di root: usare il `wrangler` globale.
 
 ## Verifiche fatte
 
